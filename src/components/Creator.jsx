@@ -3,6 +3,8 @@ import JSZip from 'jszip';
 
 export default function Creator() {
     const [createdQuestions, setCreatedQuestions] = useState([]);
+    const [editingIndex, setEditingIndex] = useState(null); // Przechowuje indeks edytowanego pytania
+
     const [currentQuestion, setCurrentQuestion] = useState({
         question: '', explanation: '', questionImage: '', image: '', isOpen: false, requiredAnswersCount: 1,
         answers: [{ text: '', correct: false }, { text: '', correct: false }]
@@ -49,6 +51,28 @@ export default function Creator() {
         }
     };
 
+    const handleEditQuestion = (index) => {
+        const q = createdQuestions[index];
+        setEditingIndex(index);
+        setCurrentQuestion(q);
+
+        // Ustawienie widoczności sekcji na podstawie zawartości pytania
+        setShowQImage(!!q.questionImage);
+        setShowExpl(!!q.explanation);
+        setShowExplImage(!!q.image);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingIndex(null);
+        setCurrentQuestion({
+            question: '', explanation: '', questionImage: '', image: '', isOpen: false, requiredAnswersCount: 1,
+            answers: [{ text: '', correct: false }, { text: '', correct: false }]
+        });
+        setShowQImage(false);
+        setShowExpl(false);
+        setShowExplImage(false);
+    };
+
     const saveQuestion = () => {
         if (!currentQuestion.question || currentQuestion.answers.length === 0) return;
         const hasCorrect = currentQuestion.answers.some(a => a.correct && a.text.trim() !== '');
@@ -57,15 +81,15 @@ export default function Creator() {
             return alert("Wymagana liczba odpowiedzi nie może być większa niż zdefiniowana pula!");
         }
 
-        setCreatedQuestions([...createdQuestions, currentQuestion]);
+        if (editingIndex !== null) {
+            const updated = [...createdQuestions];
+            updated[editingIndex] = currentQuestion;
+            setCreatedQuestions(updated);
+        } else {
+            setCreatedQuestions([...createdQuestions, currentQuestion]);
+        }
 
-        setCurrentQuestion({
-            question: '', explanation: '', questionImage: '', image: '', isOpen: false, requiredAnswersCount: 1,
-            answers: [{ text: '', correct: false }, { text: '', correct: false }]
-        });
-        setShowQImage(false);
-        setShowExpl(false);
-        setShowExplImage(false);
+        handleCancelEdit();
     };
 
     const handleDownload = async () => {
@@ -120,7 +144,7 @@ export default function Creator() {
                         <label htmlFor="openToggle" className="font-semibold text-slate-700 cursor-pointer text-sm">Pytanie otwarte</label>
                     </div>
 
-                    {/* Przyciski w nowej linii */}
+                    {/* Przyciski multimediów */}
                     <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-100">
                         <button onClick={() => handleToggleField('questionImage', showQImage, setShowQImage)} className={`text-sm font-semibold px-3 py-1.5 rounded-md transition-colors ${showQImage || currentQuestion.questionImage ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}>
                             {showQImage || currentQuestion.questionImage ? '✖ Usuń zdjęcie pytania' : '➕ Zdjęcie pytania'}
@@ -211,15 +235,70 @@ export default function Creator() {
                     </button>
                 </div>
 
-                <button onClick={saveQuestion} className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700">
-                    Dodaj pytanie do zestawu
-                </button>
+                {/* Przyciski zapisu/anulowania */}
+                <div className="flex gap-4">
+                    <button
+                        onClick={saveQuestion}
+                        className={`flex-1 font-bold py-3 rounded-xl transition-colors ${editingIndex !== null ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+                    >
+                        {editingIndex !== null ? '💾 Zapisz zmiany w pytaniu' : '➕ Dodaj pytanie do zestawu'}
+                    </button>
+
+                    {editingIndex !== null && (
+                        <button
+                            onClick={handleCancelEdit}
+                            className="px-6 bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300 transition-colors"
+                        >
+                            Anuluj
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* PRZEWIJANA LISTA PYTAŃ */}
             <div className="border-t border-slate-200 pt-6">
                 <h3 className="font-bold text-slate-800 mb-4">Twoja lista ({createdQuestions.length})</h3>
+
+                {createdQuestions.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2 border border-slate-100 rounded-xl p-3 bg-white shadow-inner">
+                        {createdQuestions.map((q, idx) => (
+                            <div key={idx} className="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100/70 transition-all shadow-sm">
+                                <div className="space-y-1 flex-1">
+                                    <p className="font-semibold text-slate-800 text-base">
+                                        {idx + 1}. {q.question || <span className="text-slate-400 italic">Brak treści pytania</span>}
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.isOpen ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {q.isOpen ? `Otwarte (wymaga: ${q.requiredAnswersCount})` : 'Zamknięte'}
+                    </span>
+                                        {q.questionImage && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-medium">🖼️ Foto pytania</span>}
+                                        {q.explanation && <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-medium">📝 Wyjaśnienie</span>}
+                                        {q.image && <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-medium">🖼️ Foto wyj.</span>}
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 ml-4 shrink-0">
+                                    <button
+                                        onClick={() => handleEditQuestion(idx)}
+                                        className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 transition"
+                                    >
+                                        Edytuj
+                                    </button>
+                                    <button
+                                        onClick={() => setCreatedQuestions(createdQuestions.filter((_, i) => i !== idx))}
+                                        className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-xs font-bold hover:bg-red-200 transition"
+                                    >
+                                        Usuń
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-slate-400 text-sm italic">Lista pytań jest pusta. Dodaj pierwsze pytanie powyżej.</p>
+                )}
+
                 {createdQuestions.length > 0 && (
-                    <button onClick={handleDownload} className="bg-green-500 text-white font-bold py-3 px-8 rounded-xl">Pobierz paczkę ZIP</button>
+                    <button onClick={handleDownload} className="mt-4 w-full md:w-auto bg-green-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-green-600 transition shadow-md">Pobierz paczkę ZIP</button>
                 )}
             </div>
         </div>
